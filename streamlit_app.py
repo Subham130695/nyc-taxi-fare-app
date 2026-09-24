@@ -126,7 +126,7 @@ def build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon):
     m = folium.Map(
         location=[center_lat_m, center_lon_m],
         zoom_start=12,
-        tiles="CartoDB positron"
+        tiles="OpenStreetMap"
     )
 
     folium.Marker(
@@ -185,26 +185,25 @@ with form_col:
     predict_clicked = st.button("Predict Fare")
 
 with map_col:
-    st.markdown('<div class="map-card">', unsafe_allow_html=True)
-    st.markdown('<div class="map-heading">Trip Route on Map</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown('<div class="map-heading">Trip Route on Map</div>', unsafe_allow_html=True)
 
-    route_map = build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
-    st_folium(
-        route_map,
-        width=None,
-        height=380,
-        key=f"map_{pickup_lat}_{pickup_lon}_{dropoff_lat}_{dropoff_lon}"
-    )
+        route_map = build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
+        st_folium(
+            route_map,
+            width=None,
+            height=380,
+            key=f"map_{pickup_lat}_{pickup_lon}_{dropoff_lat}_{dropoff_lon}"
+        )
 
-    st.markdown(
-        '<div class="map-legend">'
-        '<span><span class="legend-dot" style="background:#FF6B35;"></span>Pickup Location</span>'
-        '<span><span class="legend-dot" style="background:#1E88E5;"></span>Drop-off Location</span>'
-        '<span><span class="legend-dot" style="background:#FF6B35; border-radius:2px;"></span>Route</span>'
-        '</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="map-legend">'
+            '<span><span class="legend-dot" style="background:#FF6B35;"></span>Pickup Location</span>'
+            '<span><span class="legend-dot" style="background:#1E88E5;"></span>Drop-off Location</span>'
+            '<span><span class="legend-dot" style="background:#FF6B35; border-radius:2px;"></span>Route</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
 if predict_clicked:
     dt = datetime.combine(date_input, time_input)
