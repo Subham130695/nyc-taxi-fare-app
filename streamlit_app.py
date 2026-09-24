@@ -5,7 +5,59 @@ import pickle
 from datetime import datetime
 from tensorflow import keras
 
-st.set_page_config(page_title="NYC Taxi Fare Predictor", page_icon="🚕")
+st.set_page_config(page_title="NYC Taxi Fare Predictor", page_icon="🚕", layout="centered")
+
+st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(180deg, #FFF8F0 0%, #FFFFFF 100%);
+    }
+    h1 {
+        color: #FF6B35;
+        font-weight: 800;
+        text-align: center;
+        padding-bottom: 0px;
+    }
+    .subtitle {
+        text-align: center;
+        color: #666666;
+        font-size: 16px;
+        margin-bottom: 30px;
+    }
+    div.stButton > button {
+        background-color: #FF6B35;
+        color: white;
+        font-weight: 700;
+        border-radius: 8px;
+        padding: 10px 24px;
+        border: none;
+        width: 100%;
+        font-size: 16px;
+    }
+    div.stButton > button:hover {
+        background-color: #E85A2A;
+        color: white;
+    }
+    .fare-card {
+        background-color: #FFF3EC;
+        border: 2px solid #FF6B35;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        margin-top: 20px;
+    }
+    .fare-amount {
+        font-size: 36px;
+        font-weight: 800;
+        color: #FF6B35;
+    }
+    .distance-text {
+        color: #666666;
+        font-size: 15px;
+        margin-top: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 @st.cache_resource
 def load_model_and_scaler():
@@ -29,60 +81,34 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * np.arcsin(np.sqrt(a))
     return R * c
 
-def render_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon):
-    map_html = f"""
-    <div style="border-radius:16px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.08); border:1px solid #eee;">
-      <div id="trip-map" style="height:420px; width:100%;"></div>
-    </div>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    <script>
-      var map = L.map('trip-map');
-      L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-          attribution: '&copy; OpenStreetMap contributors',
-          maxZoom: 19
-      }}).addTo(map);
+def near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, ap_lat, ap_lon):
+    d1 = haversine_distance(pickup_lat, pickup_lon, ap_lat, ap_lon)
+    d2 = haversine_distance(dropoff_lat, dropoff_lon, ap_lat, ap_lon)
+    return (d1 < 2) or (d2 < 2)
 
-      var pickup = [{pickup_lat}, {pickup_lon}];
-      var dropoff = [{dropoff_lat}, {dropoff_lon}];
-
-      var orangeIcon = L.icon({{
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-          iconSize: [25, 41], iconAnchor: [12, 41]
-      }});
-      var blueIcon = L.icon({{
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-          iconSize: [25, 41], iconAnchor: [12, 41]
-      }});
-
-      L.marker(pickup, {{icon: orangeIcon}}).addTo(map).bindPopup("Pickup<br>" + pickup[0] + ", " + pickup[1]);
-      L.marker(dropoff, {{icon: blueIcon}}).addTo(map).bindPopup("Drop-off<br>" + dropoff[0] + ", " + dropoff[1]);
-
-      var routeLine = L.polyline([pickup, dropoff], {{color: '#FF6B35', weight: 4, opacity: 0.8}}).addTo(map);
-
-      var bounds = L.latLngBounds([pickup, dropoff]);
-      map.fitBounds(bounds, {{padding: [40, 40]}});
-    </script>
-    """
-    st.components.v1.html(map_html, height=440)
-
-st.title("NYC Taxi Fare Prediction")
-st.write("Enter trip details to get an estimated fare.")
+st.markdown("<h1>NYC Taxi Fare Prediction</h1>", unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Enter your trip details below to get an instant fare estimate</p>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
+    st.markdown("**Pickup Location**")
     pickup_lat = st.number_input("Pickup Latitude", value=40.7580, format="%.6f")
     pickup_lon = st.number_input("Pickup Longitude", value=-73.9855, format="%.6f")
+    st.markdown("**Trip Details**")
+    passenger_count = st.slider("Passenger Count", 1, 6, 1)
+
+with col2:
+    st.markdown("**Drop-off Location**")
     dropoff_lat = st.number_input("Drop-off Latitude", value=40.6413, format="%.6f")
     dropoff_lon = st.number_input("Drop-off Longitude", value=-73.7781, format="%.6f")
-with col2:
-    passenger_count = st.slider("Passenger Count", 1, 6, 1)
+    st.markdown("**Date & Time**")
     date_input = st.date_input("Date")
     time_input = st.time_input("Time")
 
-if st.button("Predict Fare", type="primary"):
+st.write("")
+predict_clicked = st.button("Predict Fare")
+
+if predict_clicked:
     dt = datetime.combine(date_input, time_input)
     hour = dt.hour
     day_of_week = dt.weekday()
@@ -96,10 +122,8 @@ if st.button("Predict Fare", type="primary"):
     distance_per_passenger = trip_distance_km / passenger_count
     pickup_dist_from_center = haversine_distance(pickup_lat, pickup_lon, center_lat, center_lon)
 
-    near_jfk = (haversine_distance(pickup_lat, pickup_lon, jfk_lat, jfk_lon) < 2) or \
-               (haversine_distance(dropoff_lat, dropoff_lon, jfk_lat, jfk_lon) < 2)
-    near_lga = (haversine_distance(pickup_lat, pickup_lon, lga_lat, lga_lon) < 2) or \
-               (haversine_distance(dropoff_lat, dropoff_lon, lga_lat, lga_lon) < 2)
+    near_jfk = near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, jfk_lat, jfk_lon)
+    near_lga = near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, lga_lat, lga_lon)
     is_airport_trip = int(near_jfk or near_lga)
 
     features = np.array([[
@@ -111,8 +135,11 @@ if st.button("Predict Fare", type="primary"):
     features_scaled = scaler.transform(features)
     predicted_fare = model.predict(features_scaled, verbose=0)[0][0]
 
-    st.success(f"Estimated Taxi Fare: ${predicted_fare:.2f}")
-    st.info(f"Trip Distance: {trip_distance_km:.2f} km")
-
-# --- TEMPORARY: testing the map renders correctly (Step 1 only) ---
-render_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
+    st.markdown(
+        '<div class="fare-card">'
+        '<div>Estimated Taxi Fare</div>'
+        '<div class="fare-amount">$' + f"{predicted_fare:.2f}" + '</div>'
+        '<div class="distance-text">Trip Distance: ' + f"{trip_distance_km:.2f}" + ' km</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
