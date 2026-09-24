@@ -6,7 +6,7 @@ from tensorflow import keras
 import folium
 from streamlit_folium import st_folium
 
-st.set_page_config(page_title="NYC Taxi Fare Predictor", page_icon="🚕", layout="centered")
+st.set_page_config(page_title="NYC Taxi Fare Predictor", page_icon="🚕", layout="wide")
 
 st.markdown("""
     <style>
@@ -162,27 +162,49 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-col1, col2 = st.columns(2)
+form_col, map_col = st.columns([1, 1])
 
-with col1:
-    st.markdown("**Pickup Location**")
-    pickup_lat = st.number_input("Pickup Latitude", value=40.7580, format="%.6f")
-    pickup_lon = st.number_input("Pickup Longitude", value=-73.9855, format="%.6f")
+with form_col:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Pickup Location**")
+        pickup_lat = st.number_input("Pickup Latitude", value=40.7580, format="%.6f")
+        pickup_lon = st.number_input("Pickup Longitude", value=-73.9855, format="%.6f")
+        st.markdown("**Trip Details**")
+        passenger_count = st.slider("Passenger Count", 1, 6, 1)
 
-    st.markdown("**Trip Details**")
-    passenger_count = st.slider("Passenger Count", 1, 6, 1)
+    with col2:
+        st.markdown("**Drop-off Location**")
+        dropoff_lat = st.number_input("Drop-off Latitude", value=40.6413, format="%.6f")
+        dropoff_lon = st.number_input("Drop-off Longitude", value=-73.7781, format="%.6f")
+        st.markdown("**Date & Time**")
+        date_input = st.date_input("Date")
+        time_input = st.time_input("Time")
 
-with col2:
-    st.markdown("**Drop-off Location**")
-    dropoff_lat = st.number_input("Drop-off Latitude", value=40.6413, format="%.6f")
-    dropoff_lon = st.number_input("Drop-off Longitude", value=-73.7781, format="%.6f")
+    st.write("")
+    predict_clicked = st.button("Predict Fare")
 
-    st.markdown("**Date & Time**")
-    date_input = st.date_input("Date")
-    time_input = st.time_input("Time")
+with map_col:
+    st.markdown('<div class="map-card">', unsafe_allow_html=True)
+    st.markdown('<div class="map-heading">Trip Route on Map</div>', unsafe_allow_html=True)
 
-st.write("")
-predict_clicked = st.button("Predict Fare")
+    route_map = build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
+    st_folium(
+        route_map,
+        width=None,
+        height=380,
+        key=f"map_{pickup_lat}_{pickup_lon}_{dropoff_lat}_{dropoff_lon}"
+    )
+
+    st.markdown(
+        '<div class="map-legend">'
+        '<span><span class="legend-dot" style="background:#FF6B35;"></span>Pickup Location</span>'
+        '<span><span class="legend-dot" style="background:#1E88E5;"></span>Drop-off Location</span>'
+        '<span><span class="legend-dot" style="background:#FF6B35; border-radius:2px;"></span>Route</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if predict_clicked:
     dt = datetime.combine(date_input, time_input)
