@@ -182,36 +182,25 @@ st.markdown(
 
 form_col, map_col = st.columns([1, 1])
 
-with form_col:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**Pickup Location**")
-        pickup_lat = st.number_input("Pickup Latitude", format="%.6f", key="pickup_lat")
-        pickup_lon = st.number_input("Pickup Longitude", format="%.6f", key="pickup_lon")
-        st.markdown("**Trip Details**")
-        passenger_count = st.slider("Passenger Count", 1, 6, 1)
-
-    with col2:
-        st.markdown("**Drop-off Location**")
-        dropoff_lat = st.number_input("Drop-off Latitude", format="%.6f", key="dropoff_lat")
-        dropoff_lon = st.number_input("Drop-off Longitude", format="%.6f", key="dropoff_lon")
-        st.markdown("**Date & Time**")
-        date_input = st.date_input("Date")
-        time_input = st.time_input("Time")
-
-    st.write("")
-    predict_clicked = st.button("Predict Fare")
-
+# --- Map column is processed FIRST so any session_state update from a click
+# happens BEFORE the number_input widgets below are instantiated. Writing to
+# st.session_state["pickup_lat"] (etc.) after those widgets exist in this run
+# is what caused the StreamlitWidgetAlreadyInstantiatedError. ---
 with map_col:
     with st.container(border=True):
         st.markdown('<div class="map-heading">Trip Route on Map</div>', unsafe_allow_html=True)
 
-        route_map = build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
+        route_map = build_route_map(
+            st.session_state.pickup_lat,
+            st.session_state.pickup_lon,
+            st.session_state.dropoff_lat,
+            st.session_state.dropoff_lon
+        )
         map_data = st_folium(
             route_map,
             width=None,
             height=380,
-            key=f"map_{pickup_lat}_{pickup_lon}_{dropoff_lat}_{dropoff_lon}"
+            key="route_map"
         )
 
         st.markdown(
@@ -244,6 +233,26 @@ with map_col:
                     st.session_state.dropoff_lon = clicked_lon
                     st.session_state.click_stage = "pickup"
                     st.rerun()
+
+with form_col:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Pickup Location**")
+        pickup_lat = st.number_input("Pickup Latitude", format="%.6f", key="pickup_lat")
+        pickup_lon = st.number_input("Pickup Longitude", format="%.6f", key="pickup_lon")
+        st.markdown("**Trip Details**")
+        passenger_count = st.slider("Passenger Count", 1, 6, 1)
+
+    with col2:
+        st.markdown("**Drop-off Location**")
+        dropoff_lat = st.number_input("Drop-off Latitude", format="%.6f", key="dropoff_lat")
+        dropoff_lon = st.number_input("Drop-off Longitude", format="%.6f", key="dropoff_lon")
+        st.markdown("**Date & Time**")
+        date_input = st.date_input("Date")
+        time_input = st.time_input("Time")
+
+    st.write("")
+    predict_clicked = st.button("Predict Fare")
 
 if predict_clicked:
     dt = datetime.combine(date_input, time_input)
