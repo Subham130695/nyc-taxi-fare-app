@@ -1,9 +1,10 @@
-
 import streamlit as st
 import numpy as np
 import pickle
 from datetime import datetime
 from tensorflow import keras
+import folium
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="NYC Taxi Fare Predictor", page_icon="🚕", layout="centered")
 
@@ -56,6 +57,35 @@ st.markdown("""
         font-size: 15px;
         margin-top: 8px;
     }
+    .map-card {
+        background-color: #FFFFFF;
+        border: 2px solid #FFE0D1;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 12px;
+    }
+    .map-heading {
+        font-weight: 700;
+        color: #1A1A1A;
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
+    .map-legend {
+        display: flex;
+        gap: 16px;
+        font-size: 13px;
+        color: #444444;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -72,6 +102,7 @@ jfk_lat, jfk_lon = 40.6413, -73.7781
 lga_lat, lga_lon = 40.7769, -73.8740
 center_lat, center_lon = 40.7831, -73.9712
 
+
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -81,19 +112,63 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * np.arcsin(np.sqrt(a))
     return R * c
 
+
 def near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, ap_lat, ap_lon):
     d1 = haversine_distance(pickup_lat, pickup_lon, ap_lat, ap_lon)
     d2 = haversine_distance(dropoff_lat, dropoff_lon, ap_lat, ap_lon)
     return (d1 < 2) or (d2 < 2)
 
+
+def build_route_map(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon):
+    center_lat_m = (pickup_lat + dropoff_lat) / 2
+    center_lon_m = (pickup_lon + dropoff_lon) / 2
+
+    m = folium.Map(
+        location=[center_lat_m, center_lon_m],
+        zoom_start=12,
+        tiles="CartoDB positron"
+    )
+
+    folium.Marker(
+        [pickup_lat, pickup_lon],
+        popup="Pickup",
+        icon=folium.Icon(color="orange", icon="play")
+    ).add_to(m)
+
+    folium.Marker(
+        [dropoff_lat, dropoff_lon],
+        popup="Drop-off",
+        icon=folium.Icon(color="blue", icon="stop")
+    ).add_to(m)
+
+    folium.PolyLine(
+        locations=[[pickup_lat, pickup_lon], [dropoff_lat, dropoff_lon]],
+        color="#FF6B35",
+        weight=4,
+        opacity=0.8
+    ).add_to(m)
+
+    m.fit_bounds(
+        [[pickup_lat, pickup_lon], [dropoff_lat, dropoff_lon]],
+        padding=(30, 30)
+    )
+
+    return m
+
+
 st.markdown("<h1>NYC Taxi Fare Prediction</h1>", unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Enter your trip details below to get an instant fare estimate</p>', unsafe_allow_html=True)
+st.markdown(
+    '<p class="subtitle">Enter your trip details below to get an instant fare estimate</p>',
+    unsafe_allow_html=True
+)
 
 col1, col2 = st.columns(2)
+
 with col1:
     st.markdown("**Pickup Location**")
     pickup_lat = st.number_input("Pickup Latitude", value=40.7580, format="%.6f")
     pickup_lon = st.number_input("Pickup Longitude", value=-73.9855, format="%.6f")
+
     st.markdown("**Trip Details**")
     passenger_count = st.slider("Passenger Count", 1, 6, 1)
 
@@ -101,6 +176,7 @@ with col2:
     st.markdown("**Drop-off Location**")
     dropoff_lat = st.number_input("Drop-off Latitude", value=40.6413, format="%.6f")
     dropoff_lon = st.number_input("Drop-off Longitude", value=-73.7781, format="%.6f")
+
     st.markdown("**Date & Time**")
     date_input = st.date_input("Date")
     time_input = st.time_input("Time")
@@ -114,22 +190,61 @@ if predict_clicked:
     day_of_week = dt.weekday()
     month = dt.month
     is_weekend = int(day_of_week in [5, 6])
-    is_rush_hour = int(not is_weekend and ((7 <= hour <= 10) or (16 <= hour <= 19)))
+    is_rush_hour = int(
+        not is_weekend and ((7 <= hour <= 10) or (16 <= hour <= 19))
+    )
 
-    trip_distance_km = haversine_distance(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon)
+    trip_distance_km = haversine_distance(
+        pickup_lat,
+        pickup_lon,
+        dropoff_lat,
+        dropoff_lon
+    )
+
     lat_diff = dropoff_lat - pickup_lat
     lon_diff = dropoff_lon - pickup_lon
     distance_per_passenger = trip_distance_km / passenger_count
-    pickup_dist_from_center = haversine_distance(pickup_lat, pickup_lon, center_lat, center_lon)
 
-    near_jfk = near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, jfk_lat, jfk_lon)
-    near_lga = near_airport(pickup_lat, pickup_lon, dropoff_lat, dropoff_lon, lga_lat, lga_lon)
+    pickup_dist_from_center = haversine_distance(
+        pickup_lat,
+        pickup_lon,
+        center_lat,
+        center_lon
+    )
+
+    near_jfk = near_airport(
+        pickup_lat,
+        pickup_lon,
+        dropoff_lat,
+        dropoff_lon,
+        jfk_lat,
+        jfk_lon
+    )
+
+    near_lga = near_airport(
+        pickup_lat,
+        pickup_lon,
+        dropoff_lat,
+        dropoff_lon,
+        lga_lat,
+        lga_lon
+    )
+
     is_airport_trip = int(near_jfk or near_lga)
 
     features = np.array([[
-        trip_distance_km, lat_diff, lon_diff, passenger_count,
-        hour, day_of_week, month, is_weekend, is_rush_hour,
-        distance_per_passenger, pickup_dist_from_center, is_airport_trip
+        trip_distance_km,
+        lat_diff,
+        lon_diff,
+        passenger_count,
+        hour,
+        day_of_week,
+        month,
+        is_weekend,
+        is_rush_hour,
+        distance_per_passenger,
+        pickup_dist_from_center,
+        is_airport_trip
     ]])
 
     features_scaled = scaler.transform(features)
