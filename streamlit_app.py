@@ -107,6 +107,13 @@ jfk_lat, jfk_lon = 40.6413, -73.7781
 lga_lat, lga_lon = 40.7769, -73.8740
 center_lat, center_lon = 40.7831, -73.9712
 
+NYC_LAT_MIN, NYC_LAT_MAX = 40.40, 41.00
+NYC_LON_MIN, NYC_LON_MAX = -74.30, -73.60
+
+
+def is_within_nyc(lat, lon):
+    return (NYC_LAT_MIN <= lat <= NYC_LAT_MAX) and (NYC_LON_MIN <= lon <= NYC_LON_MAX)
+
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371
@@ -255,76 +262,82 @@ with form_col:
     predict_clicked = st.button("Predict Fare")
 
 if predict_clicked:
-    dt = datetime.combine(date_input, time_input)
-    hour = dt.hour
-    day_of_week = dt.weekday()
-    month = dt.month
-    is_weekend = int(day_of_week in [5, 6])
-    is_rush_hour = int(
-        not is_weekend and ((7 <= hour <= 10) or (16 <= hour <= 19))
-    )
+    if not (is_within_nyc(pickup_lat, pickup_lon) and is_within_nyc(dropoff_lat, dropoff_lon)):
+        st.warning(
+            "⚠️ This model is trained only on NYC taxi trips. "
+            "Please select pickup and drop-off locations within the New York City area."
+        )
+    else:
+        dt = datetime.combine(date_input, time_input)
+        hour = dt.hour
+        day_of_week = dt.weekday()
+        month = dt.month
+        is_weekend = int(day_of_week in [5, 6])
+        is_rush_hour = int(
+            not is_weekend and ((7 <= hour <= 10) or (16 <= hour <= 19))
+        )
 
-    trip_distance_km = haversine_distance(
-        pickup_lat,
-        pickup_lon,
-        dropoff_lat,
-        dropoff_lon
-    )
+        trip_distance_km = haversine_distance(
+            pickup_lat,
+            pickup_lon,
+            dropoff_lat,
+            dropoff_lon
+        )
 
-    lat_diff = dropoff_lat - pickup_lat
-    lon_diff = dropoff_lon - pickup_lon
-    distance_per_passenger = trip_distance_km / passenger_count
+        lat_diff = dropoff_lat - pickup_lat
+        lon_diff = dropoff_lon - pickup_lon
+        distance_per_passenger = trip_distance_km / passenger_count
 
-    pickup_dist_from_center = haversine_distance(
-        pickup_lat,
-        pickup_lon,
-        center_lat,
-        center_lon
-    )
+        pickup_dist_from_center = haversine_distance(
+            pickup_lat,
+            pickup_lon,
+            center_lat,
+            center_lon
+        )
 
-    near_jfk = near_airport(
-        pickup_lat,
-        pickup_lon,
-        dropoff_lat,
-        dropoff_lon,
-        jfk_lat,
-        jfk_lon
-    )
+        near_jfk = near_airport(
+            pickup_lat,
+            pickup_lon,
+            dropoff_lat,
+            dropoff_lon,
+            jfk_lat,
+            jfk_lon
+        )
 
-    near_lga = near_airport(
-        pickup_lat,
-        pickup_lon,
-        dropoff_lat,
-        dropoff_lon,
-        lga_lat,
-        lga_lon
-    )
+        near_lga = near_airport(
+            pickup_lat,
+            pickup_lon,
+            dropoff_lat,
+            dropoff_lon,
+            lga_lat,
+            lga_lon
+        )
 
-    is_airport_trip = int(near_jfk or near_lga)
+        is_airport_trip = int(near_jfk or near_lga)
 
-    features = np.array([[
-        trip_distance_km,
-        lat_diff,
-        lon_diff,
-        passenger_count,
-        hour,
-        day_of_week,
-        month,
-        is_weekend,
-        is_rush_hour,
-        distance_per_passenger,
-        pickup_dist_from_center,
-        is_airport_trip
-    ]])
+        features = np.array([[
+            trip_distance_km,
+            lat_diff,
+            lon_diff,
+            passenger_count,
+            hour,
+            day_of_week,
+            month,
+            is_weekend,
+            is_rush_hour,
+            distance_per_passenger,
+            pickup_dist_from_center,
+            is_airport_trip
+        ]])
 
-    features_scaled = scaler.transform(features)
-    predicted_fare = model.predict(features_scaled, verbose=0)[0][0]
+        features_scaled = scaler.transform(features)
+        predicted_fare = model.predict(features_scaled, verbose=0)[0][0]
 
-    st.markdown(
-        '<div class="fare-card">'
-        '<div>Estimated Taxi Fare</div>'
-        '<div class="fare-amount">$' + f"{predicted_fare:.2f}" + '</div>'
-        '<div class="distance-text">Trip Distance: ' + f"{trip_distance_km:.2f}" + ' km</div>'
-        '</div>',
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            '<div class="fare-card">'
+            '<div>Estimated Taxi Fare</div>'
+            '<div class="fare-amount">$' + f"{predicted_fare:.2f}" + '</div>'
+            '<div class="distance-text">Trip Distance: ' + f"{trip_distance_km:.2f}" + ' km</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
